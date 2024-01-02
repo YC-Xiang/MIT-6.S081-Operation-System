@@ -54,7 +54,7 @@ void panic(char*);
 struct cmd *parsecmd(char*);
 
 // Execute cmd.  Never returns.
-__attribute__((noreturn))
+// __attribute__((noreturn)) mac uncomment this line
 void
 runcmd(struct cmd *cmd)
 {
