@@ -84,7 +84,7 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
     panic("walk");
 
   for(int level = 2; level > 0; level--) {
-    pte_t *pte = &pagetable[PX(level, va)];
+    pte_t *pte = &pagetable[PX(level, va)]; /// PX macro 从虚拟地址va得到第level级页表的pte index
     if(*pte & PTE_V) {
       pagetable = (pagetable_t)PTE2PA(*pte);
     } else {
@@ -431,4 +431,33 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+void vmprint(pagetable_t pagetable)
+{
+  static uint8 level;
+  static uint8 once = 0;
+  if (once == 0)
+  {
+  	printf("page table %p\n", pagetable);
+	once = 1;
+  }
+
+  for(int i = 0; i < 512; i++){
+    pte_t pte = pagetable[i];
+    if((pte & PTE_V) && (pte & (PTE_R|PTE_W|PTE_X)) == 0){
+      for (int i = 0; i < level; i++)
+      {
+	printf(".. ");
+      }
+      printf("..%d: pte %p pa %p\n", i, pte, PTE2PA(pte));
+      // this PTE points to a lower-level page table.
+      level++;
+      uint64 child = PTE2PA(pte);
+      vmprint((pagetable_t)child);
+    } else if(pte & PTE_V){
+      printf(".. .. ..%d: pte %p pa %p\n", i, pte, PTE2PA(pte));
+    }
+  }
+  level = 0;
 }
