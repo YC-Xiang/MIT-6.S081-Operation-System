@@ -74,6 +74,26 @@ sys_sleep(void)
   return 0;
 }
 
+
+#ifdef LAB_PGTBL
+int
+sys_pgaccess(void)
+{
+  int num;
+  uint64 p;
+  uint64 bitmap;
+
+  if (argaddr(0, &p) < 0)
+    return -1;
+  if (argint(1, &num) < 0)
+    return -1;
+  if (argaddr(2, &bitmap) < 0)
+    return -1;
+
+  return pgaccess(p, num, bitmap);
+}
+#endif
+
 uint64
 sys_kill(void)
 {

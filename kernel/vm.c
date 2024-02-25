@@ -5,7 +5,8 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
-
+#include "spinlock.h"
+#include "proc.h"
 /*
  * the kernel's page table.
  */
@@ -460,4 +461,26 @@ void vmprint(pagetable_t pagetable)
     }
   }
   level = 0;
+}
+
+int pgaccess(uint64 va, int num, uint64 user_bitmap)
+{
+	struct proc *p = myproc();
+	pte_t *pte;
+	int ret;
+	uint32 bitmap;
+
+	for (int i = 0; i < num; i++)
+	{
+		pte = walk(p->pagetable, va + i * PGSIZE, 0);
+		if (*pte & PTE_A)
+		{
+			*pte &= ~PTE_A;
+			bitmap |= (1 << i);
+		}
+	}
+	
+	ret = copyout(p->pagetable, user_bitmap, (char *)&bitmap, 8);
+
+	return ret;
 }
