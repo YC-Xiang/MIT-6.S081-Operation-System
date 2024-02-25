@@ -80,8 +80,18 @@ sys_sleep(void)
 int
 sys_pgaccess(void)
 {
-  // lab pgtbl: your code here.
-  return 0;
+  int num;
+  uint64 p;
+  uint64 bitmap;
+
+  if (argaddr(0, &p) < 0)
+    return -1;
+  if (argint(1, &num) < 0)
+    return -1;
+  if (argaddr(2, &bitmap) < 0)
+    return -1;
+
+  return pgaccess(p, num, bitmap);
 }
 #endif
 
