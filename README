@@ -1,16 +1,5 @@
 My implementation of 2020 Fall MIT-6.S081-Operation-System
 
-util, syscall lab source code is copied from 2021 fall xv6 labs for now.
+util, syscall, pgtable lab source code is copied from 2021 fall xv6 labs for now.
 
 the later labs will copy from 2020 fall.
-
-To create a new branch procedure is:
-
-1. In main branch, git checkout -b xxx.
-2. delete the main branch code except .git/ and .gitignore and rename them.
-3. copy xxx branch source code from xv6-labs-2020 and delete .git/ and .gitignore.
-4. restore the .git/ and .gitignore in step 2.
-5. git push origin xxx to create the remote branch.
-6. git branch --set-upstream-to=origin/xxx.
-7. Now can start work on the new branch.
-8. After finishing the lab, cherry-pick the lab solution and notes to main branch.

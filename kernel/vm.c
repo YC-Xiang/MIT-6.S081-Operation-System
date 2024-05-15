@@ -22,11 +22,11 @@ kvmmake(void)
 {
   pagetable_t kpgtbl;
 
-  kpgtbl = (pagetable_t) kalloc();
+  kpgtbl = (pagetable_t) kalloc(); // 这时候内存都是未分配状态，分配出来的第一个Page是最高地址的一个page， 0x87fff000
   memset(kpgtbl, 0, PGSIZE);
 
   // uart registers
-  kvmmap(kpgtbl, UART0, UART0, PGSIZE, PTE_R | PTE_W);
+  kvmmap(kpgtbl, UART0, UART0, PGSIZE, PTE_R | PTE_W); /// 映射UART0虚拟地址到UART0物理地址
 
   // virtio mmio disk interface
   kvmmap(kpgtbl, VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
@@ -46,7 +46,7 @@ kvmmake(void)
 
   // map kernel stacks
   proc_mapstacks(kpgtbl);
-  
+
   return kpgtbl;
 }
 
@@ -85,17 +85,18 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
     panic("walk");
 
   for(int level = 2; level > 0; level--) {
-    pte_t *pte = &pagetable[PX(level, va)]; /// PX macro 从虚拟地址va得到第level级页表的pte index
-    if(*pte & PTE_V) {
+    pte_t *pte = &pagetable[PX(level, va)]; /// 根据虚拟地址得到第level级的pte地址
+    if(*pte & PTE_V) { /// pte valid
       pagetable = (pagetable_t)PTE2PA(*pte);
     } else {
-      if(!alloc || (pagetable = (pde_t*)kalloc()) == 0)
+      if(!alloc || (pagetable = (pde_t*)kalloc()) == 0) /// 如果alloc=0或kalloc分配失败，return 0
         return 0;
-      memset(pagetable, 0, PGSIZE);
-      *pte = PA2PTE(pagetable) | PTE_V;
+      /// 这边pagetable是上边kalloc出来的新地址
+      memset(pagetable, 0, PGSIZE); /// 因为该pte不存在，对应的下一级页表需要初始化，512条pte，每条8bytes，512 * 8 = 4096
+      *pte = PA2PTE(pagetable) | PTE_V; /// 该pte的内容PPN对应pagetable的地址
     }
   }
-  return &pagetable[PX(0, va)];
+  return &pagetable[PX(0, va)]; /// 返回pte地址
 }
 
 // Look up a virtual address, return the physical address,
@@ -111,11 +112,11 @@ walkaddr(pagetable_t pagetable, uint64 va)
     return 0;
 
   pte = walk(pagetable, va, 0);
-  if(pte == 0)
+  if(pte == 0) /// va对应的pte不存在
     return 0;
-  if((*pte & PTE_V) == 0)
+  if((*pte & PTE_V) == 0) /// ??? 这边应该不会跑到，如果pte没有PTE_V,在walk就会返回0
     return 0;
-  if((*pte & PTE_U) == 0)
+  if((*pte & PTE_U) == 0) /// 必须是userspace的va
     return 0;
   pa = PTE2PA(*pte);
   return pa;
@@ -143,15 +144,15 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
 
   if(size == 0)
     panic("mappages: size");
-  
+
   a = PGROUNDDOWN(va);
   last = PGROUNDDOWN(va + size - 1);
   for(;;){
     if((pte = walk(pagetable, a, 1)) == 0)
       return -1;
-    if(*pte & PTE_V)
+    if(*pte & PTE_V) /// 该pte已经被map过了
       panic("mappages: remap");
-    *pte = PA2PTE(pa) | perm | PTE_V;
+    *pte = PA2PTE(pa) | perm | PTE_V; /// 最后一级的页表pte对应物理地址了，因此把该pte用物理地址和flags赋值好
     if(a == last)
       break;
     a += PGSIZE;
@@ -173,11 +174,11 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
     panic("uvmunmap: not aligned");
 
   for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
-    if((pte = walk(pagetable, a, 0)) == 0)
+    if((pte = walk(pagetable, a, 0)) == 0) /// 如果pte不存在，返回0
       panic("uvmunmap: walk");
     if((*pte & PTE_V) == 0)
       panic("uvmunmap: not mapped");
-    if(PTE_FLAGS(*pte) == PTE_V)
+    if(PTE_FLAGS(*pte) == PTE_V) // 如果flags只有PTE_V,那么一定不是最后一级pagetable的pte
       panic("uvmunmap: not a leaf");
     if(do_free){
       uint64 pa = PTE2PA(*pte);
@@ -212,7 +213,7 @@ uvminit(pagetable_t pagetable, uchar *src, uint sz)
     panic("inituvm: more than a page");
   mem = kalloc();
   memset(mem, 0, PGSIZE);
-  mappages(pagetable, 0, PGSIZE, (uint64)mem, PTE_W|PTE_R|PTE_X|PTE_U);
+  mappages(pagetable, 0, PGSIZE, (uint64)mem, PTE_W|PTE_R|PTE_X|PTE_U); /// userspace的0地址映射到传入的*src函数
   memmove(mem, src, sz);
 }
 
@@ -235,6 +236,8 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
       return 0;
     }
     memset(mem, 0, PGSIZE);
+    /// ??? 为什么映射a到mem，a不是进程的memory size吗？
+    //A: 因为a既代表进程的memory size，刚好又是memory的结尾地址，在结尾地址开辟新空间。
     if(mappages(pagetable, a, PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
       kfree(mem);
       uvmdealloc(pagetable, a, oldsz);
@@ -249,7 +252,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 // need to be less than oldsz.  oldsz can be larger than the actual
 // process size.  Returns the new process size.
 uint64
-uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
+uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) /// 缩小内存从oldsz到newsz
 {
   if(newsz >= oldsz)
     return oldsz;
@@ -270,7 +273,7 @@ freewalk(pagetable_t pagetable)
   // there are 2^9 = 512 PTEs in a page table.
   for(int i = 0; i < 512; i++){
     pte_t pte = pagetable[i];
-    if((pte & PTE_V) && (pte & (PTE_R|PTE_W|PTE_X)) == 0){
+    if((pte & PTE_V) && (pte & (PTE_R|PTE_W|PTE_X)) == 0){ /// 不是叶pte，PTE_R|PTE_W|PTE_X不会被置起
       // this PTE points to a lower-level page table.
       uint64 child = PTE2PA(pte);
       freewalk((pagetable_t)child);
@@ -334,7 +337,7 @@ void
 uvmclear(pagetable_t pagetable, uint64 va)
 {
   pte_t *pte;
-  
+
   pte = walk(pagetable, va, 0);
   if(pte == 0)
     panic("uvmclear");
@@ -479,7 +482,7 @@ int pgaccess(uint64 va, int num, uint64 user_bitmap)
 			bitmap |= (1 << i);
 		}
 	}
-	
+
 	ret = copyout(p->pagetable, user_bitmap, (char *)&bitmap, 8);
 
 	return ret;

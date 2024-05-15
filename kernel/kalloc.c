@@ -27,7 +27,7 @@ void
 kinit()
 {
   initlock(&kmem.lock, "kmem");
-  freerange(end, (void*)PHYSTOP);
+  freerange(end, (void*)PHYSTOP); //end是在kernel text和data段之后的起始地址
 }
 
 void

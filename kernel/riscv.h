@@ -348,14 +348,14 @@ sfence_vma()
 // shift a physical address to the right place for a PTE.
 #define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)
 
-#define PTE2PA(pte) (((pte) >> 10) << 12)
+#define PTE2PA(pte) (((pte) >> 10) << 12) /// pte的内容PPN(44bits)+flags(10bits), phsical address PPN(44bits)+offset(12bits)
 
 #define PTE_FLAGS(pte) ((pte) & 0x3FF)
 
 // extract the three 9-bit page table indices from a virtual address.
 #define PXMASK          0x1FF // 9 bits
 #define PXSHIFT(level)  (PGSHIFT+(9*(level)))
-#define PX(level, va) ((((uint64) (va)) >> PXSHIFT(level)) & PXMASK)
+#define PX(level, va) ((((uint64) (va)) >> PXSHIFT(level)) & PXMASK) /// 从虚拟地址va得到第level级页表的pte index
 
 // one beyond the highest possible virtual address.
 // MAXVA is actually one bit less than the max allowed by
@@ -364,4 +364,5 @@ sfence_vma()
 #define MAXVA (1L << (9 + 9 + 9 + 12 - 1))
 
 typedef uint64 pte_t;
+/// pagetable数组保存的是512条pte
 typedef uint64 *pagetable_t; // 512 PTEs
