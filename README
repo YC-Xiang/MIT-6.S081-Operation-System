@@ -1,5 +1,1 @@
-My implementation of 2020 Fall MIT-6.S081-Operation-System
-
-util, syscall, pgtable lab source code is copied from 2021 fall xv6 labs for now.
-
-the later labs will copy from 2020 fall.
+My implementation of 2021 Fall MIT-6.S081-Operation-System
